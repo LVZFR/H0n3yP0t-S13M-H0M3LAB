@@ -1,10 +1,11 @@
 # H0n3yP0t-S13M-H0M3LAB
 [README.md](https://github.com/user-attachments/files/30042995/README.md)
+
 # Honeypot & SIEM Home Lab
 
 An internet-exposed SSH honeypot feeding a self-hosted SIEM, built to collect real-world attack telemetry and practise detection engineering. A VPS runs [Cowrie](https://github.com/cowrie/cowrie) to capture brute-force and post-exploitation activity; logs are shipped over a private WireGuard tunnel to a [Wazuh](https://wazuh.com/) server running on home-lab hardware, where they are decoded, alerted on, and mapped to MITRE ATT&CK.
 
-> **Status: 🚧 in progress.** This is an active build. The architecture and detection design below reflect the target state; the **Build progress** section tracks what is actually deployed and verified. Attack statistics are added only once the honeypot is collecting live data.
+> **Status: 🚧 in progress.** The honeypot is live on a public IP and collecting data; detection rules are being written and validated. The **Build progress** section tracks what is actually deployed and verified. Attack statistics are added only once the 30-day collection window closes.
 
 ---
 
@@ -17,12 +18,12 @@ I'm moving from carrier-grade network operations into cybersecurity, and this la
 ```
                     Internet (attackers)
                             │
-                            ▼  port 22 (bait)
+                            ▼  port 22 (bait, IPv4 + IPv6)
         ┌───────────────────────────────────┐
         │            VPS (Ubuntu 24.04)      │
         │                                    │
         │   Cowrie honeypot  ──► JSON logs   │
-        │   Real SSH admin on port 2222      │
+        │   Real SSH admin: tunnel-only      │
         │   Wazuh agent                      │
         └──────────────┬────────────────────┘
                        │  WireGuard tunnel
@@ -40,9 +41,10 @@ I'm moving from carrier-grade network operations into cybersecurity, and this la
 
 ### Design decisions
 
-- **Real SSH is moved to a non-standard port** so that port 22 can be handed entirely to the honeypot. Anything hitting 22 is, by definition, not me.
+- **Real SSH is removed from the public internet entirely.** Rather than just moving it to a high port, `sshd` binds only to the WireGuard tunnel address (`10.66.66.1`); port 22 — on both IPv4 and IPv6 — is handed entirely to the honeypot via an interface-bound `iptables`/`ip6tables` redirect. Admin access is via an SSH jump host over the tunnel. Anything reaching a real shell prompt from the public side is, by definition, not me.
 - **The Wazuh server lives at home, not on the VPS.** Keeping the SIEM off the exposed host means an attacker who compromises the honeypot never has line of sight to the log store or the detections written against them. The VPS is treated as untrusted.
 - **WireGuard is dialled out from home to the VPS.** The home connection is behind Starlink CGNAT with no inbound reachability, so the tunnel is established from the home side; the VPS acts as the fixed public endpoint the agent traffic rides back through.
+- **`sshd` is ordered after the tunnel at boot** (a systemd drop-in requiring `wg-quick@wg0`), so a reboot can't leave admin SSH unable to bind its tunnel-only address.
 - **The indexer heap is capped** so the Wazuh stack coexists with an existing local LLM inference workload on the same home machine.
 
 ## Components
@@ -57,37 +59,36 @@ I'm moving from carrier-grade network operations into cybersecurity, and this la
 
 ## Detection engineering
 
-The point of the lab is the detections, not the honeypot itself. Planned coverage, mapped to MITRE ATT&CK:
+The point of the lab is the detections, not the honeypot itself. Coverage, mapped to MITRE ATT&CK (see [`wazuh/rules/local_rules.xml`](wazuh/rules/local_rules.xml)):
 
-- **Credential brute force (T1110)** — alert on repeated failed authentications from a single source within a short window.
-- **Valid-account use (T1078)** — flag a "successful" login into the Cowrie sandbox, i.e. an attacker who got past the (deliberately weak) credentials.
-- **Post-login command capture** — decode the commands attackers run inside the sandbox and surface the common patterns (payload downloads, persistence attempts, recon).
-- **Custom Cowrie decoder** — parse Cowrie's JSON fields (source IP, username, password, input) into Wazuh so rules can match on them directly.
-- **Purple-team validation** — run scripted ATT&CK techniques against an agent host with [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) and confirm each fires the expected alert, pairing *technique executed → alert raised*.
+- **Credential brute force (T1110)** — a single failed login is low-severity raw material; 6+ from one source within 120s raises a high-severity burst alert, grouped per source IP.
+- **Valid-account use (T1078)** — a "successful" login into the Cowrie sandbox (an attacker past the deliberately weak credentials) is the headline event, level 12.
+- **Post-login command capture (T1059)** — every command typed in the fake shell is decoded and surfaced, revealing the common patterns (recon, payload downloads, persistence).
+- **Ingress tool transfer (T1105)** — file downloads pulled into the sandbox are flagged.
+- **Native JSON decoding** — Cowrie's JSON is parsed by Wazuh's built-in `json` decoder, so rules match fields (`eventid`, `src_ip`, `username`, `input`) directly. No custom decoder ([why](wazuh/decoders/README.md)).
+- **Purple-team validation (planned)** — run scripted ATT&CK techniques on an agent host with [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) and confirm each fires the expected alert, pairing *technique executed → alert raised*.
 
 ## Build progress
 
 - [x] Provision VPS (Ubuntu 24.04 LTS)
-- [ ] Host hardening — SSH to non-standard port, key-only auth, UFW, fail2ban
-- [ ] WireGuard tunnel: VPS ↔ home lab
-- [ ] Wazuh server (manager + indexer + dashboard) on home lab
-- [ ] Enrol Wazuh agents (VPS + home hosts)
-- [ ] Deploy Cowrie on the VPS
-- [ ] Ship Cowrie logs into Wazuh (custom decoder + rules)
-- [ ] MITRE ATT&CK rule mapping
+- [x] Host hardening — real SSH moved to tunnel-only, key auth, boot ordering
+- [x] WireGuard tunnel: VPS ↔ home lab
+- [x] Wazuh server (manager + indexer + dashboard) on home lab
+- [x] Enrol Wazuh agents (VPS + home hosts)
+- [x] Deploy Cowrie on the VPS (dual-stack listener, public 22 redirected)
+- [x] Ship Cowrie logs into Wazuh (native JSON, agent → manager verified)
+- [ ] Custom detection rules + MITRE ATT&CK mapping *(in progress)*
 - [ ] Atomic Red Team purple-team validation
 - [ ] Telegram alerting on high-severity events
 - [ ] Publish 30-day honeypot analysis
 
 ## Repository layout
 
-*(populated as the build progresses)*
-
 ```
 wazuh/
-  rules/          custom detection rules
-  decoders/       Cowrie JSON decoder
-cowrie/           honeypot config (sanitised)
+  rules/          custom detection rules (local_rules.xml)
+  decoders/       note on why native JSON decoding is used
+cowrie/           honeypot config (sanitised — overrides only)
 wireguard/        tunnel config templates (no keys)
 docs/             architecture notes, build log, analysis
 ```
