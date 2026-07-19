@@ -1,0 +1,17 @@
+# Never commit secrets or real infrastructure detail
+*.key
+*.pem
+*_key
+*_key.pub
+wireguard/*.conf
+!wireguard/*.conf.template
+*.token
+.env
+telegram_token*
+# Real IPs / host keys captured during testing
+**/known_hosts
+# Cowrie runtime data (contains attacker IPs, credentials, payloads)
+cowrie/var/
+*.json
+*.log
+.DS_Store

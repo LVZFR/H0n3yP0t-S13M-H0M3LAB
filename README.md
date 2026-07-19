@@ -1,6 +1,3 @@
-# H0n3yP0t-S13M-H0M3LAB
-[README.md](https://github.com/user-attachments/files/30042995/README.md)
-
 # Honeypot & SIEM Home Lab
 
 An internet-exposed SSH honeypot feeding a self-hosted SIEM, built to collect real-world attack telemetry and practise detection engineering. A VPS runs [Cowrie](https://github.com/cowrie/cowrie) to capture brute-force and post-exploitation activity; logs are shipped over a private WireGuard tunnel to a [Wazuh](https://wazuh.com/) server running on home-lab hardware, where they are decoded, alerted on, and mapped to MITRE ATT&CK.
@@ -68,6 +65,20 @@ The point of the lab is the detections, not the honeypot itself. Coverage, mappe
 - **Native JSON decoding** — Cowrie's JSON is parsed by Wazuh's built-in `json` decoder, so rules match fields (`eventid`, `src_ip`, `username`, `input`) directly. No custom decoder ([why](wazuh/decoders/README.md)).
 - **Purple-team validation (planned)** — run scripted ATT&CK techniques on an agent host with [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) and confirm each fires the expected alert, pairing *technique executed → alert raised*.
 
+### Coverage
+
+Rules live in [`wazuh/rules/local_rules.xml`](wazuh/rules/local_rules.xml). Validated against both self-tests and live scanner traffic hitting the exposed honeypot.
+
+| Rule | Detection | ATT&CK | Severity | Validated |
+|------|-----------|--------|----------|-----------|
+| 100100 | Failed SSH login to honeypot | T1110 — Brute Force | 5 | ✅ live traffic |
+| 100101 | Brute-force burst (≥6 failures / 120s, per source) | T1110 — Brute Force | 10 | ✅ live traffic |
+| 100102 | Successful login into the sandbox | T1078 — Valid Accounts | 12 | ✅ `wazuh-logtest` |
+| 100103 | Command executed in the fake shell | T1059 — Command & Scripting Interpreter | 6 | 🚧 deployed |
+| 100104 | File download pulled into session | T1105 — Ingress Tool Transfer | 10 | 🚧 deployed |
+
+Wazuh auto-enriches each alert from the `<mitre>` tag — e.g. rule 100102 surfaces as *Valid Accounts* across the Defense Evasion, Persistence, Privilege Escalation, and Initial Access tactics in the ATT&CK dashboard.
+
 ## Build progress
 
 - [x] Provision VPS (Ubuntu 24.04 LTS)
@@ -77,7 +88,7 @@ The point of the lab is the detections, not the honeypot itself. Coverage, mappe
 - [x] Enrol Wazuh agents (VPS + home hosts)
 - [x] Deploy Cowrie on the VPS (dual-stack listener, public 22 redirected)
 - [x] Ship Cowrie logs into Wazuh (native JSON, agent → manager verified)
-- [ ] Custom detection rules + MITRE ATT&CK mapping *(in progress)*
+- [x] Custom detection rules + MITRE ATT&CK mapping (T1110 / T1078 validated live)
 - [ ] Atomic Red Team purple-team validation
 - [ ] Telegram alerting on high-severity events
 - [ ] Publish 30-day honeypot analysis
