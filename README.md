@@ -27,13 +27,15 @@ I'm moving from carrier-grade network operations into cybersecurity, and this la
                        │  (VPS is public endpoint;
                        │   home dials out — Starlink CGNAT)
                        ▼
-        ┌───────────────────────────────────┐
-        │      Home lab (HP Pavilion)        │
-        │                                    │
-        │   Wazuh manager + indexer + dash   │
-        │   Detection rules, ATT&CK mapping  │
-        │   Alerts ──► Telegram              │
-        └───────────────────────────────────┘
+        ┌───────────────────────────────────┐         ┌──────────────────────────────┐
+        │      Home lab (HP Pavilion)        │◄────────│   Test VM (Oracle Linux 9)   │
+        │                                    │  agent  │                              │
+        │   Wazuh manager + indexer + dash   │  over   │   Wazuh agent                │
+        │   Detection rules, ATT&CK mapping  │  LAN    │   Atomic Red Team runner     │
+        │   Alerts ──► Telegram              │         │   (purple-team validation)   │
+        └───────────────────────────────────┘         └──────────────────────────────┘
+              both on the home LAN (192.168.50.0/24); the VM is a disposable host —
+              attacks run there, NOT on the honeypot or the manager.
 ```
 
 ### Design decisions
@@ -53,6 +55,7 @@ I'm moving from carrier-grade network operations into cybersecurity, and this la
 | WireGuard | Encrypted transport between VPS and home lab | Both |
 | Wazuh manager | Rule engine, decoders, alerting | Home lab |
 | Wazuh indexer + dashboard | Storage and visualisation | Home lab |
+| Test VM (Oracle Linux 9) | Disposable purple-team host; Wazuh agent + Atomic Red Team | Home lab |
 
 ## Detection engineering
 
@@ -63,7 +66,7 @@ The point of the lab is the detections, not the honeypot itself. Coverage, mappe
 - **Post-login command capture (T1059)** — every command typed in the fake shell is decoded and surfaced, revealing the common patterns (recon, payload downloads, persistence).
 - **Ingress tool transfer (T1105)** — file downloads pulled into the sandbox are flagged.
 - **Native JSON decoding** — Cowrie's JSON is parsed by Wazuh's built-in `json` decoder, so rules match fields (`eventid`, `src_ip`, `username`, `input`) directly. No custom decoder ([why](wazuh/decoders/README.md)).
-- **Purple-team validation (planned)** — run scripted ATT&CK techniques on an agent host with [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team) and confirm each fires the expected alert, pairing *technique executed → alert raised*.
+- **Purple-team validation (in progress)** — a disposable Oracle Linux 9 VM runs a Wazuh agent and [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team); scripted ATT&CK techniques are executed there and each is confirmed to fire the expected alert, pairing *technique executed → alert raised*. Atomics run on the monitored VM (host-based detections), never on the honeypot or the manager.
 
 ### Coverage
 
@@ -89,7 +92,8 @@ Wazuh auto-enriches each alert from the `<mitre>` tag — e.g. rule 100102 surfa
 - [x] Deploy Cowrie on the VPS (dual-stack listener, public 22 redirected)
 - [x] Ship Cowrie logs into Wazuh (native JSON, agent → manager verified)
 - [x] Custom detection rules + MITRE ATT&CK mapping (T1110 / T1078 validated live)
-- [ ] Atomic Red Team purple-team validation
+- [x] Stand up disposable purple-team VM (Oracle Linux 9, Wazuh agent enrolled)
+- [ ] Atomic Red Team purple-team validation *(in progress)*
 - [ ] Telegram alerting on high-severity events
 - [ ] Publish 30-day honeypot analysis
 
