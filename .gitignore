@@ -14,4 +14,3 @@ telegram_token*
 cowrie/var/
 *.json
 *.log
-.DS_Store

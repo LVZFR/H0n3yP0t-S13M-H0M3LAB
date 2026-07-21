@@ -66,7 +66,7 @@ The point of the lab is the detections, not the honeypot itself. Coverage, mappe
 - **Post-login command capture (T1059)** — every command typed in the fake shell is decoded and surfaced, revealing the common patterns (recon, payload downloads, persistence).
 - **Ingress tool transfer (T1105)** — file downloads pulled into the sandbox are flagged.
 - **Native JSON decoding** — Cowrie's JSON is parsed by Wazuh's built-in `json` decoder, so rules match fields (`eventid`, `src_ip`, `username`, `input`) directly. No custom decoder ([why](wazuh/decoders/README.md)).
-- **Purple-team validation (in progress)** — a disposable Oracle Linux 9 VM runs a Wazuh agent and [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team); scripted ATT&CK techniques are executed there and each is confirmed to fire the expected alert, pairing *technique executed → alert raised*. Atomics run on the monitored VM (host-based detections), never on the honeypot or the manager.
+- **Purple-team validation** — a disposable Oracle Linux 9 VM runs a Wazuh agent and [Atomic Red Team](https://github.com/redcanaryco/atomic-red-team); ATT&CK techniques are executed there and confirmed to fire the expected alert, pairing *technique executed → alert raised*. **T1136.001** (create account → rule 5902) and **T1110** (brute force → rules 5710/5712) validated so far — full results in the [coverage report](docs/purple-team-coverage.md). Atomics run on the monitored VM only, never on the honeypot (which would contaminate the live attacker dataset).
 
 ### Coverage
 
@@ -93,7 +93,7 @@ Wazuh auto-enriches each alert from the `<mitre>` tag — e.g. rule 100102 surfa
 - [x] Ship Cowrie logs into Wazuh (native JSON, agent → manager verified)
 - [x] Custom detection rules + MITRE ATT&CK mapping (T1110 / T1078 validated live)
 - [x] Stand up disposable purple-team VM (Oracle Linux 9, Wazuh agent enrolled)
-- [ ] Atomic Red Team purple-team validation *(in progress)*
+- [x] Purple-team validation — T1136.001 and T1110 executed and detected ([coverage report](docs/purple-team-coverage.md))
 - [ ] Telegram alerting on high-severity events
 - [ ] Publish 30-day honeypot analysis
 
