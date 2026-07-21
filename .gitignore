@@ -1,3 +1,8 @@
+# macOS / editor cruft
+.DS_Store
+**/.DS_Store
+*.swp
+
 # Never commit secrets or real infrastructure detail
 *.key
 *.pem
