@@ -115,9 +115,11 @@ This is a personal research lab. The honeypot is a sandbox by design and is not 
 ---
 
 Dashboard
+
 <img width="1917" height="679" alt="image" src="https://github.com/user-attachments/assets/07263610-8179-4ef5-bc1a-b05d3e404ffd" />
 
 Telegram
+
 <img width="868" height="412" alt="image" src="https://github.com/user-attachments/assets/5050c8f7-1d72-4a52-8989-da6e82c14454" />
 
 
