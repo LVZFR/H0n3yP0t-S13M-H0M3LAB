@@ -113,5 +113,6 @@ docs/             architecture notes, build log, analysis
 This is a personal research lab. The honeypot is a sandbox by design and is not connected to any production system. Configuration published here is sanitised — no keys, tokens, or real IPs. Attacker source data shown in any analysis is aggregated and used only to characterise attack patterns.
 
 ---
+<img width="1917" height="679" alt="image" src="https://github.com/user-attachments/assets/07263610-8179-4ef5-bc1a-b05d3e404ffd" />
 
 *Part of an ongoing home-lab portfolio. Companion repos: [t2-macbook-linux](https://github.com/LVZFR), [home-network-monitoring](https://github.com/LVZFR).*
